@@ -18,4 +18,4 @@
   - nearby cities
   - max 50 rows returned per request for free keys :(
 - https://aviation-edge.com/airline-routes-database-and-api/
-  - $7 a month for 30k API calls
+  - $7 for 1 month trial; 30k API calls
