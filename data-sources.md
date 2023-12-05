@@ -1,7 +1,7 @@
 ## Cities
 
 - https://hub.arcgis.com/datasets/esri::usa-major-cities/about
-  - best
+  - best, ./data/us-major-cities is the shapefile from this
 - https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-cities-and-towns.html
   - https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/cities/totals/
   - https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/
@@ -9,6 +9,10 @@
   - https://pypi.org/project/census/
 - https://www.arcgis.com/home/item.html?id=9df5e769bfe8412b8de36a2e618c7672
 - https://github.com/plotly/datasets/blob/master/us-cities-top-1k.csv
+
+## States shapefile
+
+- https://hub.arcgis.com/datasets/1b02c87f62d24508970dc1a6df80c98e_0/about
 
 ## Flight Info
 
@@ -19,3 +23,5 @@
   - max 50 rows returned per request for free keys :(
 - https://aviation-edge.com/airline-routes-database-and-api/
   - $7 for 1 month trial; 30k API calls
+- https://openflights.org/data.php
+- https://data.world/garyhoov/us-airline-route-segments-2015
