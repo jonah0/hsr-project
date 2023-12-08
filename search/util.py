@@ -54,12 +54,14 @@ class BetterPriorityQueue:
                 return i
         return None
 
+
 def nullHeuristic(state, problem=None):
     """
     A heuristic function estimates the cost from the current state to the nearest
     goal in the provided SearchProblem.  This heuristic is trivial.
     """
     return 0
+
 
 def great_circle_two_points(pt1: Point, pt2: Point):
     return great_circle((pt1.y, pt1.x), (pt2.y, pt2.x))
@@ -68,11 +70,19 @@ def great_circle_two_points(pt1: Point, pt2: Point):
 def getPassServed(city1, city2):
     pass
 
+
 def getEmissionsSaved(city1, city2):
     pass
+
 
 def getRailCost(city1, city2):
     pass
 
+
 def getTimeSaved(city1, city2):
+    pass
+
+
+def getConstructionCost(state):
+    # todo maybe should be a function of the Problem?
     pass

@@ -6,13 +6,16 @@ import util
 # TODO: How to define a goal state
 
 def isGoalState(state, budget):
-    budget -= util.getStateCost(state)
-    budget >= 0
+    budget -= util.getConstructionCost(state)
+    return budget >= 0
 
 
 class HighSpeedRailProblem:
 
     def getStartState(self):
+        pass
+
+    def isGoalState(self, state):
         pass
 
     def getSuccessors(self, state):
