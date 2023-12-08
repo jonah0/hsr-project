@@ -25,3 +25,32 @@
   - $7 for 1 month trial; 30k API calls
 - https://openflights.org/data.php
 - https://data.world/garyhoov/us-airline-route-segments-2015
+
+## Airports/cities
+
+- https://api-ninjas.com/api/airports
+  - 10k free calls
+- https://ourairports.com/data/
+  - **wrapper:** https://github.com/matthewgall/ourairports
+- https://github.com/topics/iata-codes
+  - https://github.com/lxndrblz/Airports
+    - CSV dump with city code!
+  - https://github.com/mborsetti/airportsdata
+    - both iata and icao, no city code
+  - https://github.com/mwgg/Airports
+    - json format, no city code
+-
+
+## Passengers/Seats flown by route
+
+- https://www.kaggle.com/datasets/flashgordon/usa-airport-dataset/data
+  - huge, amazing dataset, unclear on the source
+  - ends in 2009
+- https://jblevins.org/notes/airline-data
+  - might have useful data, unsure
+- https://www.transtats.bts.gov/tables.asp?gnoyr_VQ=FKF&flf_gnoyr_anzr=g_QOEO_gVPXRg
+  - best, 10% survey so multiply by 10 according to librarian
+
+## CO2 emissions
+
+- https://www.statista.com/statistics/1185559/carbon-footprint-of-travel-per-kilometer-by-mode-of-transport
