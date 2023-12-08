@@ -3,11 +3,14 @@ from geopy.distance import great_circle, geodesic
 from shapely.geometry import Point
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import geopandas as gpd
 import itertools
 
+test_data = pd.read_csv('../data/algo_testing_data.csv')
 
 # --------------------------------------------------- Methods/Functionality ------------------------------------------ #
+
 
 class BetterPriorityQueue:
     """
@@ -67,8 +70,15 @@ def great_circle_two_points(pt1: Point, pt2: Point):
     return great_circle((pt1.y, pt1.x), (pt2.y, pt2.x))
 
 
+def getRow(city1, city2) -> pd.DataFrame:
+    return test_data.loc[(test_data['Origin'] == city1) & (test_data['Dest'] == city2)].iloc[0]
+
+
 def getPassServed(city1, city2):
-    pass
+    row = getRow(city1, city2)
+    pop_orign = row['pop_origin']
+    pop_dest = row['pop_dest']
+    return pop_orign + pop_dest
 
 
 def getEmissionsSaved(city1, city2):
