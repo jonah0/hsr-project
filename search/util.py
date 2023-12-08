@@ -82,17 +82,30 @@ def getPassServed(city1, city2):
 
 
 def getEmissionsSaved(city1, city2):
-    pass
+    row = getRow(city1, city2)
+    return row['co2_g']
 
 
 def getRailCost(city1, city2):
-    pass
-
+    row = getRow(city1, city2)
+    return row['construction_cost_usd']
 
 def getTimeSaved(city1, city2):
-    pass
+    row = getRow(city1, city2)
+    time_hsr = row['hsr_travel_time_hr']
+    time_plane = row['plane_travel_time_hr']
+    return time_plane - time_hsr
 
 
-def getConstructionCost(state):
-    # todo maybe should be a function of the Problem?
-    pass
+# sample_city1 = 'LAX'
+# sample_city2 = 'BOS'
+#
+# pass_served = getPassServed(sample_city1, sample_city2)
+# emissions_saved = getEmissionsSaved(sample_city1, sample_city2)
+# rail_cost = getRailCost(sample_city1, sample_city2)
+# time_saved = getTimeSaved(sample_city1, sample_city2)
+#
+# print(f"Passengers Served: {pass_served}")
+# print(f"Emissions Saved: {emissions_saved}")
+# print(f"Rail Cost: {rail_cost}")
+# print(f"Time Saved: {time_saved}")
