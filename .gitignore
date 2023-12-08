@@ -2,6 +2,8 @@
 # data/
 out/
 .vscode
+*.zip
+temp*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
