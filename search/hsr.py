@@ -26,11 +26,14 @@ class HighSpeedRailProblem:
 
 
 def main():
-    initial_state = ...  # blank map
-    heuristic = 0
+    # a state in the search problem is a set of rail segments.
+    # each segment should be a tuple of cities
+    # todo: decide: each city is either represented by its name or its IATA airport code (BOS, LAX...)
+    initial_state = set()  # blank map
+
     hsr = HighSpeedRailProblem()
     # performing the search
-    solution = HSRSearch(hsr, heuristic)
+    solution = HSRSearch(hsr)
     print(solution)
 
 

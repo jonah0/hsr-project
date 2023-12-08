@@ -2,9 +2,12 @@ from hsr import HighSpeedRailProblem
 import util
 
 # defining the search algorithm
+
+
 def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
     startState = problem.getStartState()
     startNode = (startState, [])
+    # explored is set of states (each state is set of rail segments)
     explored = set()
     frontier = util.BetterPriorityQueue()
     frontier.push(startNode, 0)
@@ -30,6 +33,7 @@ def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
                 nodeWithNextState = frontier.findNodeWithState(nextState)
                 frontier.update(nodeWithNextState, nextNode, nextPriority)
 
+
 def evaluate_hsr(city1, city2):
     weight_pass = 0.4
     weight_time = 0.3
@@ -39,4 +43,3 @@ def evaluate_hsr(city1, city2):
     score = 0
     score += weight_pass * util.getPassServed(city1, city2)
     score += weight_emissions * util.getEmissionsSaved(city1, city2)
-
