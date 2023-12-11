@@ -85,8 +85,10 @@ class HighSpeedRailProblemPandas:
         nextStatesAndCosts = actions.apply(lambda row: self.computeNextStateAndCost(state, row), axis='columns')
         return nextStatesAndCosts.tolist()
 
-    def computeNextStateAndCost(self, currentState: pd.DataFrame, action: pd.DataFrame) -> tuple:
-        newState = pd.concat([currentState, action], axis='index')
+    def computeNextStateAndCost(self, currentState: pd.DataFrame, action: pd.Series) -> tuple:
+        # transpose action from series into a single-row dataframe so that we can use pd.concat()
+        action_df = action.to_frame().T
+        newState = pd.concat([currentState, action_df], axis='index')
         newCost = self.getCostOfActions(newState)
         return (newState, newCost)
 
@@ -153,6 +155,9 @@ class HSRProblem1Pandas(HighSpeedRailProblemPandas):
         return totalConstructionCost >= self.budget
 
     def getCostOfActions(self, actions: pd.DataFrame):
+        if actions.empty:
+            return 0
+
         cost = 0
         # todo vectorize! unless requires additional functions that cant be vectorized
         acts = actions[self.colsForHash].itertuples(name='rail', index=False)
@@ -274,7 +279,8 @@ def main():
     hsr = HSRProblem1Pandas(od_matrix=filtered_od, budget=BUDGET_USD)
 
     solution = HSRSearchPandas(hsr)
-    print(solution)
+    print('solution found! exporting to csv...')
+    solution.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
 
 
 if __name__ == '__main__':
