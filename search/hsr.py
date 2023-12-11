@@ -131,6 +131,33 @@ class HSRProblem1(HighSpeedRailProblem):
         return cost
 
 
+class HSRProblem1Pandas(HighSpeedRailProblemPandas):
+    """
+    Problem 1 is exploring the following question:
+    Given a fixed construction budget, what is the optimal selection of intercity rail corridors to build?
+    - The cost of building a certain rail segment is the negative of the "benefit"
+    gained from the segment, as defined by the metrics we are interested in.
+    - The goal state is any state in which the total monetary costs of constructing
+    all present rail segments is equal to the predetermined budget.
+    """
+
+    def __init__(self, budget=0) -> None:
+        super()
+        self.budget = budget
+
+    def isGoalState(self, state: pd.DataFrame):
+        totalConstructionCost = state['construction_cost_usd'].sum()
+        return totalConstructionCost >= self.budget
+
+    def getCostOfActions(self, actions: pd.DataFrame):
+        cost = 0
+        # todo vectorize! unless requires additional functions that cant be vectorized
+        acts = actions[self.colsForHash].itertuples(name='rail', index=False)
+        for (origin, dest) in acts:
+            cost += evaluate_hsr(origin, dest)
+        return cost
+
+
 class HSRProblem2(HighSpeedRailProblem):
     """
     Problem 2 is exploring the following question:
