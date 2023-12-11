@@ -58,6 +58,46 @@ class BetterPriorityQueue:
         return None
 
 
+class PriorityQueue:
+    """
+      Implements a priority queue data structure. Each inserted item
+      has a priority associated with it and the client is usually interested
+      in quick retrieval of the lowest-priority item in the queue. This
+      data structure allows O(1) access to the lowest-priority item.
+    """
+
+    def __init__(self):
+        self.heap = []
+        self.count = 0
+
+    def push(self, item, priority):
+        entry = (priority, self.count, item)
+        heapq.heappush(self.heap, entry)
+        self.count += 1
+
+    def pop(self):
+        (_, _, item) = heapq.heappop(self.heap)
+        return item
+
+    def isEmpty(self):
+        return len(self.heap) == 0
+
+    def update(self, item, priority):
+        # If item already in priority queue with higher priority, update its priority and rebuild the heap.
+        # If item already in priority queue with equal or lower priority, do nothing.
+        # If item not in priority queue, do the same thing as self.push.
+        for index, (p, c, i) in enumerate(self.heap):
+            if i == item:
+                if p <= priority:
+                    break
+                del self.heap[index]
+                self.heap.append((priority, c, item))
+                heapq.heapify(self.heap)
+                break
+        else:
+            self.push(item, priority)
+
+
 def nullHeuristic(state, problem=None):
     """
     A heuristic function estimates the cost from the current state to the nearest
@@ -74,23 +114,24 @@ def getRow(city1, city2) -> pd.DataFrame:
     return test_data.loc[(test_data['Origin'] == city1) & (test_data['Dest'] == city2)].iloc[0]
 
 
-def getPassServed(city1, city2):
+def getPassServed(city1, city2) -> float:
     row = getRow(city1, city2)
     pop_orign = row['pop_origin']
     pop_dest = row['pop_dest']
     return pop_orign + pop_dest
 
 
-def getEmissionsSaved(city1, city2):
+def getEmissionsSaved(city1, city2) -> float:
     row = getRow(city1, city2)
     return row['co2_g']
 
 
-def getRailCost(city1, city2):
+def getRailCost(city1, city2) -> float:
     row = getRow(city1, city2)
     return row['construction_cost_usd']
 
-def getTimeSaved(city1, city2):
+
+def getTimeSaved(city1, city2) -> float:
     row = getRow(city1, city2)
     time_hsr = row['hsr_travel_time_hr']
     time_plane = row['plane_travel_time_hr']
