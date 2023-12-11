@@ -113,7 +113,7 @@ def great_circle_two_points(pt1: Point, pt2: Point):
     return great_circle((pt1.y, pt1.x), (pt2.y, pt2.x))
 
 
-def getRow(city1, city2) -> pd.DataFrame:
+def getRow(city1, city2) -> pd.Series:
     return test_data.loc[(test_data['Origin'] == city1) & (test_data['Dest'] == city2)].iloc[0]
 
 

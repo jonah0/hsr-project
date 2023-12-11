@@ -3,6 +3,7 @@ import pathlib
 import numpy as np
 import pandas as pd
 import util
+import cProfile
 
 cwd = pathlib.Path(__file__).parent.resolve()
 
@@ -81,7 +82,6 @@ class HighSpeedRailProblemPandas:
 
     def getSuccessors(self, state: pd.DataFrame) -> List[tuple[pd.DataFrame, float]]:
         actions = self.getValidActions(state)
-        # todo check datatypes
         nextStatesAndCosts = actions.apply(lambda row: self.computeNextStateAndCost(state, row), axis='columns')
         return nextStatesAndCosts.tolist()
 
@@ -158,12 +158,22 @@ class HSRProblem1Pandas(HighSpeedRailProblemPandas):
         if actions.empty:
             return 0
 
-        cost = 0
-        # todo vectorize! unless requires additional functions that cant be vectorized
-        acts = actions[self.colsForHash].itertuples(name='rail', index=False)
-        for (origin, dest) in acts:
-            cost += evaluate_hsr(origin, dest)
-        return cost
+        weight_pop = -0
+        weight_time = +100
+        weight_emissions = -0.4 * (1/1e8)
+
+        score = 0
+        score += weight_pop * (actions['pop_origin'] + actions['pop_dest'])
+        score += weight_time * (actions['hsr_travel_time_hr'] -
+                                actions['plane_travel_time_hr'] + 3)  # add 3 hrs for security, etc
+        score += weight_emissions * actions['co2_g']
+        return score.sum()
+
+        # cost = 0
+        # acts = actions[self.colsForHash].itertuples(name='rail', index=False)
+        # for (origin, dest) in acts:
+        #     cost += evaluate_hsr(origin, dest)
+        # return cost
 
 
 class HSRProblem2(HighSpeedRailProblem):
@@ -232,7 +242,11 @@ def HSRSearchPandas(problem: HighSpeedRailProblemPandas, heuristic=util.nullHeur
     frontier.push(startStateHash, 0)
 
     while not frontier.isEmpty():
+        # print('frontier size:', len(frontier.heap))
+        # print('hashToState size:', len(hashToState))
+        # print('hashToCost size:', len(hashToCost))
         currentStateHash = frontier.pop()
+        # print('currentStateHash:',  currentStateHash)
         currentState = hashToState[currentStateHash]
         # currentCost = hashToCost[currentStateHash] # todo needed?
         explored.add(currentStateHash)
@@ -260,20 +274,33 @@ def evaluate_hsr(city1, city2) -> float:
     weight_emissions = -0.4
 
     score = 0
-    score += weight_pass * util.getPassServed(city1, city2)
-    score += weight_time * util.getTimeSaved(city1, city2)
-    score += weight_emissions * util.getEmissionsSaved(city1, city2)
+
+    row = util.getRow(city1, city2)
+
+    pop_orign = row['pop_origin']
+    pop_dest = row['pop_dest']
+    score += weight_pass * (pop_orign + pop_dest)
+
+    time_hsr = row['hsr_travel_time_hr']
+    time_plane = row['plane_travel_time_hr']
+    score += weight_time * (time_plane - time_hsr)
+
+    score += weight_emissions * (row['co2_g'])
     return score
 
 
 def main():
     # to cut down on the search space, only consider cities with a minimum population
-    MIN_POP = 2e6
-    BUDGET_USD = 1e11
+    MIN_POP = 400e3
+    MAX_POP = 1e99
+    BUDGET_USD = 50e9
 
     # todo: decide: each city is either represented by its name or its IATA airport code (BOS, LAX...)
     od_matrix = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
-    mask = (od_matrix['pop_origin'] >= MIN_POP) & (od_matrix['pop_dest'] >= MIN_POP)
+    mask = (od_matrix['pop_origin'] >= MIN_POP) &\
+        (od_matrix['pop_origin'] <= MAX_POP) &\
+        (od_matrix['pop_dest'] >= MIN_POP) &\
+        (od_matrix['pop_dest'] <= MAX_POP)
     filtered_od = od_matrix[mask]
 
     hsr = HSRProblem1Pandas(od_matrix=filtered_od, budget=BUDGET_USD)
@@ -284,4 +311,5 @@ def main():
 
 
 if __name__ == '__main__':
+    # cProfile.run('main()', sort='cumulative') # for time analysis
     main()
