@@ -219,10 +219,10 @@ def HSRSearchPandas(problem: HighSpeedRailProblemPandas, heuristic=util.nullHeur
 
 
 def evaluate_hsr(city1, city2) -> float:
-    weight_pass = 0.4
-    weight_time = 0.3
+    weight_pass = -0.4
+    weight_time = -0.3
     # weight_cost = -0.3
-    weight_emissions = 0.4
+    weight_emissions = -0.4
 
     score = 0
     score += weight_pass * util.getPassServed(city1, city2)
