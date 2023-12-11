@@ -51,7 +51,7 @@ class HighSpeedRailProblemPandas:
     - The action space is simply placing any rail segment that is not present.
     """
 
-    def __init__(self, od_matrix: pd.DataFrame, colsForHash=['Origin', 'Dest']) -> None:
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest']) -> None:
         # od_matrix is origin-destination matrix; DataFrame of all city pairs and their associated metrics
         self.od_matrix = od_matrix
         self.colsForHash = colsForHash
