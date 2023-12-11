@@ -1,4 +1,5 @@
 import heapq
+import pathlib
 from geopy.distance import great_circle, geodesic
 from shapely.geometry import Point
 import numpy as np
@@ -7,7 +8,9 @@ import pandas as pd
 import geopandas as gpd
 import itertools
 
-test_data = pd.read_csv('../data/algo_testing_data.csv')
+
+cwd = pathlib.Path(__file__).parent.resolve()
+test_data = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
 
 # --------------------------------------------------- Methods/Functionality ------------------------------------------ #
 
