@@ -1,7 +1,10 @@
 from typing import Dict, Set, List
+import pathlib
 import numpy as np
 import pandas as pd
 import util
+
+cwd = pathlib.Path(__file__).parent.resolve()
 
 
 class HighSpeedRailProblem:
@@ -110,7 +113,7 @@ class HSRProblem1(HighSpeedRailProblem):
     all present rail segments is equal to the predetermined budget.
     """
 
-    def __init__(self, budget=0) -> None:
+    def __init__(self, budget: float = 0) -> None:
         super()
         self.budget = budget
 
@@ -141,8 +144,8 @@ class HSRProblem1Pandas(HighSpeedRailProblemPandas):
     all present rail segments is equal to the predetermined budget.
     """
 
-    def __init__(self, budget=0) -> None:
-        super()
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest'], budget: float = 0) -> None:
+        super().__init__(od_matrix=od_matrix, colsForHash=colsForHash)
         self.budget = budget
 
     def isGoalState(self, state: pd.DataFrame):
@@ -259,13 +262,18 @@ def evaluate_hsr(city1, city2) -> float:
 
 
 def main():
-    # a state in the search problem is a set of rail segments.
-    # each segment should be a tuple of cities
+    # to cut down on the search space, only consider cities with a minimum population
+    MIN_POP = 2e6
+    BUDGET_USD = 1e11
+
     # todo: decide: each city is either represented by its name or its IATA airport code (BOS, LAX...)
-    od_matrix = pd.read_csv('../data/algo_testing_data.csv')
-    hsr = HighSpeedRailProblem(od_matrix=od_matrix)
-    # performing the search
-    solution = HSRSearch(hsr)
+    od_matrix = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
+    mask = (od_matrix['pop_origin'] >= MIN_POP) & (od_matrix['pop_dest'] >= MIN_POP)
+    filtered_od = od_matrix[mask]
+
+    hsr = HSRProblem1Pandas(od_matrix=filtered_od, budget=BUDGET_USD)
+
+    solution = HSRSearchPandas(hsr)
     print(solution)
 
 
