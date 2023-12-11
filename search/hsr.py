@@ -51,9 +51,10 @@ class HighSpeedRailProblemPandas:
     - The action space is simply placing any rail segment that is not present.
     """
 
-    def __init__(self, od_matrix: pd.DataFrame) -> None:
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash=['Origin', 'Dest']) -> None:
         # od_matrix is origin-destination matrix; DataFrame of all city pairs and their associated metrics
         self.od_matrix = od_matrix
+        self.colsForHash = colsForHash
 
     def getStartState(self):
         return pd.DataFrame(columns=self.od_matrix.columns)
@@ -95,9 +96,8 @@ class HighSpeedRailProblemPandas:
 
         This turns the DataFrame into a hashable type that can be added to a `set` or compared easily.
         """
-        cols = ['Origin', 'Dest']
         # todo pass the frozenset to hash()?
-        return frozenset(state[cols].itertuples(name='rail', index=False))
+        return frozenset(state[self.colsForHash].itertuples(name='rail', index=False))
 
 
 class HSRProblem1(HighSpeedRailProblem):
