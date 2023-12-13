@@ -127,18 +127,24 @@ class PriorityQueue:
     def __init__(self):
         self.heap = []
         self.count = 0
+        self.hashes = set()
 
     def push(self, item, priority):
         entry = (priority, self.count, item)
+        self.hashes.add(item)
         heapq.heappush(self.heap, entry)
         self.count += 1
 
     def pop(self):
         (_, _, item) = heapq.heappop(self.heap)
+        self.hashes.remove(item)
         return item
 
     def isEmpty(self):
         return len(self.heap) == 0
+
+    def contains(self, item) -> bool:
+        return item in self.hashes
 
     def update(self, item, priority):
         # If item already in priority queue with higher priority, update its priority and rebuild the heap.
@@ -154,6 +160,7 @@ class PriorityQueue:
                 break
         else:
             self.push(item, priority)
+            self.hashes.add(item)
 
 
 def nullHeuristic(state, problem=None):
