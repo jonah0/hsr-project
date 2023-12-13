@@ -1,18 +1,73 @@
 import heapq
 import pathlib
+from typing import List
 from geopy.distance import great_circle, geodesic
 from shapely.geometry import Point
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import geopandas as gpd
-import itertools
 
 
 cwd = pathlib.Path(__file__).parent.resolve()
 test_data = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
 
 # --------------------------------------------------- Methods/Functionality ------------------------------------------ #
+
+
+class HSRSearchState():
+    """
+    A class to represent a state in our HSR search problem.
+    A state is represented as a DataFrame of actions, where each action is a single intercity
+    rail corridor built.
+    """
+
+    def __init__(self, railSegments: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest']) -> None:
+        self.railSegments = railSegments
+        self.colsForHash = colsForHash
+        self.cost: int
+
+    def computeCost(self):
+        """
+        Compute the cost of this state. Lower numbers indicate more desirable states.
+
+        NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
+        """
+        if self.railSegments.empty:
+            return 0
+
+        weight_pop = -0
+        weight_time = +100
+        weight_emissions = -0.4 * (1/1e8)
+
+        score = 0
+        score += weight_pop * (self.railSegments['pop_origin'] + self.railSegments['pop_dest'])
+        score += weight_time * (self.railSegments['hsr_travel_time_hr'] -
+                                self.railSegments['plane_travel_time_hr'] + 3)  # add 3 hrs for security, etc
+        score += weight_emissions * self.railSegments['co2_g']
+        return score.sum()
+
+    def getRailSegments(self):
+        return self.railSegments
+
+    def getCost(self):
+        if self.cost is None:
+            self.cost = self.computeCost()
+        return self.cost
+
+    def getSuccessor(self, action: pd.Series):
+        # transpose action from series into a single-row dataframe so that we can use pd.concat()
+        action_df = action.to_frame().T
+        newRailSegments = pd.concat([self.railSegments, action_df], axis='index')
+        return HSRSearchState(newRailSegments)
+
+    def getHash(self) -> frozenset:
+        """
+        Returns a `frozenset` representation of the given state, where each element of the frozenset is a rail segment.
+
+        This turns the DataFrame into a hashable type that can be added to a `set` or compared easily.
+        """
+        return frozenset(self.railSegments[self.colsForHash].itertuples(name='rail', index=False))
 
 
 class BetterPriorityQueue:
