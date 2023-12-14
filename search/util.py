@@ -27,33 +27,8 @@ class HSRSearchState():
         self.colsForHash = colsForHash
         self.cost: int
 
-    def computeCost(self):
-        """
-        Compute the cost of this state. Lower numbers indicate more desirable states.
-
-        NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
-        """
-        if self.railSegments.empty:
-            return 0
-
-        weight_pop = -0
-        weight_time = +100
-        weight_emissions = -0.4 * (1/1e8)
-
-        score = 0
-        score += weight_pop * (self.railSegments['pop_origin'] + self.railSegments['pop_dest'])
-        score += weight_time * (self.railSegments['hsr_travel_time_hr'] -
-                                self.railSegments['plane_travel_time_hr'] + 3)  # add 3 hrs for security, etc
-        score += weight_emissions * self.railSegments['co2_g']
-        return score.sum()
-
     def getRailSegments(self):
         return self.railSegments
-
-    def getCost(self):
-        if self.cost is None:
-            self.cost = self.computeCost()
-        return self.cost
 
     def getSuccessor(self, action: pd.Series):
         # transpose action from series into a single-row dataframe so that we can use pd.concat()
