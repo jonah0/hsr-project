@@ -80,48 +80,7 @@ class HighSpeedRailProblem:
         score += weight_emissions * railSegments['co2_g']
 
         return score.sum()
-
-    def getCostofStateNX(self, state: util.HSRSearchState):
-        """
-        Compute the cost of the given state. Lower numbers indicate more desirable states.
-
-        NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
-        """
-
-        railSegments = state.getRailSegments()
-        if railSegments.empty:
-            return 0
-
-        G = nx.Graph()
-
-        # Add nodes and edges to the graph
-        for _, row in railSegments.iterrows():
-            G.add_edge(row['Origin'], row['Dest'], weight=row['hsr_travel_time_hr'])
-
-        total_cost = 0
-
-        for i, city1 in enumerate(G.nodes):
-            for j, city2 in enumerate(G.nodes):
-                if i < j:
-                    path_hsr = 0
-                    # shortest_path_length(G, source=city1, target=city2, weight='weight', method='dijkstra')
-                    path_plane = row['plane_travel_time_hr']  # You need to get the actual flight time for this
-
-                    # Compute relative time saved
-                    time_saved = (path_plane - path_hsr) / path_plane
-
-                    # Compute emissions saved (you might need to normalize this)
-                    emissions_saved = 0  # Replace this with the actual emissions saved calculation
-
-                    # Compute relative number of passengers who will choose rail journey
-                    # (replace this with the actual calculation based on your function)
-                    passengers_saved = 0  # Replace this with the actual calculation
-
-                    # Compute cost for each city pair
-                    cost_ij = -(time_saved + emissions_saved + passengers_saved)
-                    total_cost += cost_ij
-
-        return total_cost
+        
 
     def hashState(self, state: pd.DataFrame) -> frozenset:
         """
