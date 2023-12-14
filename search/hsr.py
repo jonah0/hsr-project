@@ -1,5 +1,7 @@
 from typing import Dict, Set, List, Any
 import pathlib
+
+import networkx as nx
 import numpy as np
 import pandas as pd
 import util
@@ -9,44 +11,6 @@ cwd = pathlib.Path(__file__).parent.resolve()
 
 
 class HighSpeedRailProblem:
-    """
-    A search problem intended to explore what an optimal national HSR network
-    could look like for the US, given various performance metrics and budgetary constraints.
-    - The state space is all possible combinations of intercity rail segments.
-    A rail segment is represented as a pair of two cities.
-    - The action space is simply placing any rail segment that is not present.
-    """
-
-    def __init__(self, od_matrix: pd.DataFrame) -> None:
-        # od_matrix is origin-destination matrix; DataFrame of all city pairs and their associated metrics
-        self.od_matrix = od_matrix
-        x = self.od_matrix['Origin']
-        y = self.od_matrix['Dest']
-        xy = pd.merge(x, y, how='cross')
-        self.xy = list(zip(xy['Origin'], xy['Dest']))
-
-    def getStartState(self):
-        return set()
-
-    def isGoalState(self, state):
-        pass
-
-    def getSuccessors(self, state: list):
-        successors = []
-
-        for (origin, dest) in self.xy:
-            if (origin, dest) not in state:
-                nextState = state.copy().append((origin, dest))
-                cost = evaluate_hsr(origin, dest)
-                successors.append((nextState, (origin, dest), cost))
-
-        return successors
-
-    def getCostOfActions(self, actions):
-        pass
-
-
-class HighSpeedRailProblemPandas:
     """
     A search problem intended to explore what an optimal national HSR network
     could look like for the US, given various performance metrics and budgetary constraints.
@@ -85,7 +49,7 @@ class HighSpeedRailProblemPandas:
         nextStatesAndCosts = actions.apply(lambda row: self.computeNextStateAndCost(state, row), axis='columns')
         return nextStatesAndCosts.tolist()
 
-    def getOnlySuccessors(self, state: util.HSRSearchState) -> pd.Series[util.HSRSearchState]:
+    def getOnlySuccessors(self, state: util.HSRSearchState) -> pd.Series:
         actions = self.getValidActions(state)
         nextStates = actions.apply(lambda action: state.getSuccessor(action), axis='columns')  # type: ignore
         return nextStates
@@ -93,7 +57,7 @@ class HighSpeedRailProblemPandas:
     def computeNextStateAndCost(self, currentState: util.HSRSearchState, action: pd.Series) -> tuple:
         newState = currentState.getSuccessor(action)
         newCost = self.getCostOfState(newState)
-        return (newState, newCost)
+        return newState, newCost
 
     def getCostOfState(self, state: util.HSRSearchState):
         """
@@ -117,6 +81,48 @@ class HighSpeedRailProblemPandas:
 
         return score.sum()
 
+    def getCostofStateNX(self, state: util.HSRSearchState):
+        """
+        Compute the cost of the given state. Lower numbers indicate more desirable states.
+
+        NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
+        """
+
+        railSegments = state.getRailSegments()
+        if railSegments.empty:
+            return 0
+
+        G = nx.Graph()
+
+        # Add nodes and edges to the graph
+        for _, row in railSegments.iterrows():
+            G.add_edge(row['Origin'], row['Dest'], weight=row['hsr_travel_time_hr'])
+
+        total_cost = 0
+
+        for i, city1 in enumerate(G.nodes):
+            for j, city2 in enumerate(G.nodes):
+                if i < j:
+                    path_hsr = 0
+                    # shortest_path_length(G, source=city1, target=city2, weight='weight', method='dijkstra')
+                    path_plane = row['plane_travel_time_hr']  # You need to get the actual flight time for this
+
+                    # Compute relative time saved
+                    time_saved = (path_plane - path_hsr) / path_plane
+
+                    # Compute emissions saved (you might need to normalize this)
+                    emissions_saved = 0  # Replace this with the actual emissions saved calculation
+
+                    # Compute relative number of passengers who will choose rail journey
+                    # (replace this with the actual calculation based on your function)
+                    passengers_saved = 0  # Replace this with the actual calculation
+
+                    # Compute cost for each city pair
+                    cost_ij = -(time_saved + emissions_saved + passengers_saved)
+                    total_cost += cost_ij
+
+        return total_cost
+
     def hashState(self, state: pd.DataFrame) -> frozenset:
         """
         Returns a `frozenset` representation of the given state, where each element of the frozenset is a rail segment.
@@ -137,43 +143,12 @@ class HSRProblem1(HighSpeedRailProblem):
     all present rail segments is equal to the predetermined budget.
     """
 
-    def __init__(self, budget: float = 0) -> None:
-        super()
-        self.budget = budget
-
-    def isGoalState(self, state):
-        # todo reimplement with pandas
-        constructionCost = 0
-        for (origin, dest) in state:
-            constructionCost += util.getRailCost(origin, dest)
-        # todo this goes over budget but will change later
-        return constructionCost >= self.budget
-
-    def getCostOfActions(self, actions):
-        # todo reimplement with pandas
-        # todo costs are positive here
-        cost = 0
-        for (origin, dest) in actions:
-            cost += evaluate_hsr(origin, dest)
-        return cost
-
-
-class HSRProblem1Pandas(HighSpeedRailProblemPandas):
-    """
-    Problem 1 is exploring the following question:
-    Given a fixed construction budget, what is the optimal selection of intercity rail corridors to build?
-    - The cost of building a certain rail segment is the negative of the "benefit"
-    gained from the segment, as defined by the metrics we are interested in.
-    - The goal state is any state in which the total monetary costs of constructing
-    all present rail segments is equal to the predetermined budget.
-    """
-
     def __init__(self, od_matrix: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest'], budget: float = 0) -> None:
         super().__init__(od_matrix=od_matrix, colsForHash=colsForHash)
         self.budget = budget
 
     def isGoalState(self, state: pd.DataFrame):
-        totalConstructionCost = state['construction_cost_usd'].sum()
+        totalConstructionCost = state.getRailSegments()['construction_cost_usd'].sum()
         return totalConstructionCost >= self.budget
 
 
@@ -191,40 +166,6 @@ class HSRProblem2(HighSpeedRailProblem):
 
 
 def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
-    startState = problem.getStartState()
-    # a node is a tuple of: (state, path-so-far, cost)
-    # todo path-so-far should be hashable set?
-    startNode = (startState, [], 0)
-    # explored is set of states (each state is set of rail segments)
-    explored = set()
-    frontier = util.BetterPriorityQueue()
-    frontier.push(startNode, 0)
-
-    while not frontier.isEmpty():
-        currentNode = frontier.pop()
-        explored.add(currentNode[0])
-
-        if problem.isGoalState(currentNode[0]):
-            return currentNode[1]
-
-        successors = problem.getSuccessors(currentNode[0])
-        for (nextState, action, cost) in successors:
-            pathSoFar = currentNode[1].copy()
-            pathSoFar.append(action)
-
-            # will be value of priority in the queue
-            nextCost = currentNode[2] + cost
-            nextNode = (nextState, pathSoFar, nextCost)
-            nextPriority = nextCost + heuristic(nextState, problem)
-
-            if nextState not in explored:
-                nodeWithNextState = frontier.findNodeWithState(nextState)
-                frontier.update(nodeWithNextState, nextNode, nextPriority)
-
-    return False  # if frontier empty, no solution
-
-
-def HSRSearchPandas(problem: HighSpeedRailProblemPandas, heuristic=util.nullHeuristic):
     # dict of state hashes to states
     hashToState: Dict[frozenset, util.HSRSearchState] = {}
     # dict of state hashes to state costs (eliminates need for frontier to hold costs)
@@ -305,11 +246,15 @@ def main():
         (od_matrix['pop_dest'] <= MAX_POP)
     filtered_od = od_matrix[mask]
 
-    hsr = HSRProblem1Pandas(od_matrix=filtered_od, budget=BUDGET_USD)
+    hsr = HSRProblem1(od_matrix=filtered_od, budget=BUDGET_USD)
 
-    solution = HSRSearchPandas(hsr)
+    solution = HSRSearch(hsr)
     print('solution found! exporting to csv...')
-    solution.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
+
+    solution_data = solution.getRailSegments()
+    solution_df = pd.DataFrame(solution_data)
+
+    solution_df.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
 
 
 if __name__ == '__main__':
