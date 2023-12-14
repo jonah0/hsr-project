@@ -59,7 +59,7 @@ class HighSpeedRailProblem:
         newCost = self.getCostOfState(newState)
         return newState, newCost
 
-    def getCostOfState(self, state: util.HSRSearchState):
+    def getCostOfState(self, state: util.HSRSearchState) -> float:
         """
         Compute the cost of the given state. Lower numbers indicate more desirable states.
 
@@ -80,7 +80,6 @@ class HighSpeedRailProblem:
         score += weight_emissions * railSegments['co2_g']
 
         return score.sum()
-        
 
     def hashState(self, state: pd.DataFrame) -> frozenset:
         """
@@ -158,7 +157,7 @@ def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
                 hashToState[nextStateHash] = nextState
             # compute cost only if we've never encountered this state (hash) before
             if nextStateHash not in hashToCost:
-                hashToCost[nextStateHash] = nextState.computeCost()
+                hashToCost[nextStateHash] = problem.getCostOfState(nextState)
 
             nextCost = hashToCost[nextStateHash]
             nextPriority = nextCost + heuristic(nextState, problem)
@@ -208,12 +207,11 @@ def main():
     hsr = HSRProblem1(od_matrix=filtered_od, budget=BUDGET_USD)
 
     solution = HSRSearch(hsr)
-    print('solution found! exporting to csv...')
-
-    solution_data = solution.getRailSegments()
-    solution_df = pd.DataFrame(solution_data)
-
-    solution_df.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
+    if solution:
+        print('solution found! exporting to csv...')
+        solution.railSegments.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
+    else:
+        print('no solution found :(')
 
 
 if __name__ == '__main__':
