@@ -1,4 +1,3 @@
-from typing import Dict, Set, List, Any
 import pathlib
 
 import networkx as nx
@@ -19,7 +18,7 @@ class HighSpeedRailProblem:
     - The action space is simply placing any rail segment that is not present.
     """
 
-    def __init__(self, od_matrix: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest']) -> None:
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash: list[str] = ['Origin', 'Dest']) -> None:
         # od_matrix is origin-destination matrix; DataFrame of all city pairs and their associated metrics
         self.od_matrix = od_matrix
         self.colsForHash = colsForHash
@@ -44,15 +43,15 @@ class HighSpeedRailProblem:
         actions = merged[mask]
         return actions[cols]
 
-    def getSuccessors(self, state: util.HSRSearchState) -> List[tuple[util.HSRSearchState, float]]:
+    def getSuccessors(self, state: util.HSRSearchState) -> list[tuple[util.HSRSearchState, float]]:
         actions = self.getValidActions(state)
         nextStatesAndCosts = actions.apply(lambda row: self.computeNextStateAndCost(state, row), axis='columns')
         return nextStatesAndCosts.tolist()
 
-    def getOnlySuccessors(self, state: util.HSRSearchState) -> pd.Series:
+    def getOnlySuccessors(self, state: util.HSRSearchState) -> list[util.HSRSearchState]:
         actions = self.getValidActions(state)
-        nextStates = actions.apply(lambda action: state.getSuccessor(action), axis='columns')  # type: ignore
-        return nextStates
+        nextStates: pd.Series = actions.apply(lambda action: state.getSuccessor(action), axis='columns')  # type: ignore
+        return nextStates.tolist()
 
     def computeNextStateAndCost(self, currentState: util.HSRSearchState, action: pd.Series) -> tuple:
         newState = currentState.getSuccessor(action)
@@ -65,30 +64,8 @@ class HighSpeedRailProblem:
 
         NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
         """
-        railSegments = state.getRailSegments()
-        if railSegments.empty:
-            return 0
 
-        weight_pop = -0
-        weight_time = +100
-        weight_emissions = -0.4 * (1/1e8)
-
-        score = 0
-        score += weight_pop * (railSegments['pop_origin'] + railSegments['pop_dest'])
-        score += weight_time * (railSegments['hsr_travel_time_hr'] -
-                                railSegments['plane_travel_time_hr'] + 3)  # add 3 hrs for security, etc
-        score += weight_emissions * railSegments['co2_g']
-
-        return score.sum()
-
-    def hashState(self, state: pd.DataFrame) -> frozenset:
-        """
-        Returns a `frozenset` representation of the given state, where each element of the frozenset is a rail segment.
-
-        This turns the DataFrame into a hashable type that can be added to a `set` or compared easily.
-        """
-        # todo pass the frozenset to hash()?
-        return frozenset(state[self.colsForHash].itertuples(name='rail', index=False))
+        return 0
 
 
 class HSRProblem1(HighSpeedRailProblem):
@@ -101,11 +78,11 @@ class HSRProblem1(HighSpeedRailProblem):
     all present rail segments is equal to the predetermined budget.
     """
 
-    def __init__(self, od_matrix: pd.DataFrame, colsForHash: List[str] = ['Origin', 'Dest'], budget: float = 0) -> None:
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash: list[str] = ['Origin', 'Dest'], budget: float = 0) -> None:
         super().__init__(od_matrix=od_matrix, colsForHash=colsForHash)
         self.budget = budget
 
-    def isGoalState(self, state: pd.DataFrame):
+    def isGoalState(self, state: util.HSRSearchState):
         totalConstructionCost = state.getRailSegments()['construction_cost_usd'].sum()
         return totalConstructionCost >= self.budget
 
@@ -125,11 +102,11 @@ class HSRProblem2(HighSpeedRailProblem):
 
 def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
     # dict of state hashes to states
-    hashToState: Dict[frozenset, util.HSRSearchState] = {}
+    hashToState: dict[frozenset, util.HSRSearchState] = {}
     # dict of state hashes to state costs (eliminates need for frontier to hold costs)
-    hashToCost: Dict[frozenset, float] = {}
+    hashToCost: dict[frozenset, float] = {}
     # explored is set of (hashed) states
-    explored: Set[frozenset] = set()
+    explored: set[frozenset] = set()
 
     # a state is a dataframe of all intercity rail segments
     # cost is defined by the cost function of the problem
@@ -166,28 +143,6 @@ def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
                 frontier.update(nextStateHash, nextPriority)
 
     return False  # if frontier empty, no solution
-
-
-def evaluate_hsr(city1, city2) -> float:
-    weight_pass = -0.4
-    weight_time = -0.3
-    # weight_cost = -0.3
-    weight_emissions = -0.4
-
-    score = 0
-
-    row = util.getRow(city1, city2)
-
-    pop_orign = row['pop_origin']
-    pop_dest = row['pop_dest']
-    score += weight_pass * (pop_orign + pop_dest)
-
-    time_hsr = row['hsr_travel_time_hr']
-    time_plane = row['plane_travel_time_hr']
-    score += weight_time * (time_plane - time_hsr)
-
-    score += weight_emissions * (row['co2_g'])
-    return score
 
 
 def main():
