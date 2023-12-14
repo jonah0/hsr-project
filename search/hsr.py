@@ -251,11 +251,16 @@ def HSRSearchPandas(problem: HighSpeedRailProblemPandas, heuristic=util.nullHeur
         if problem.isGoalState(currentState):
             return currentState
 
-        successors = problem.getSuccessors(currentState)
-        for (nextState, nextCost) in successors:
+        successors = problem.getOnlySuccessors(currentState)
+        for nextState in successors:
             nextStateHash = nextState.getHash()
-            hashToState[nextStateHash] = nextState
-            hashToCost[nextStateHash] = nextCost
+            if nextStateHash not in hashToState:
+                hashToState[nextStateHash] = nextState
+            # compute cost only if we've never encountered this state (hash) before
+            if nextStateHash not in hashToCost:
+                hashToCost[nextStateHash] = nextState.computeCost()
+
+            nextCost = hashToCost[nextStateHash]
             nextPriority = nextCost + heuristic(nextState, problem)
 
             if nextStateHash not in explored:
