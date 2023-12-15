@@ -44,20 +44,10 @@ class HighSpeedRailProblem:
         actions = merged[mask]
         return actions[cols]
 
-    def getSuccessors(self, state: util.HSRSearchState) -> list[tuple[util.HSRSearchState, float]]:
-        actions = self.getValidActions(state)
-        nextStatesAndCosts = actions.apply(lambda row: self.computeNextStateAndCost(state, row), axis='columns')
-        return nextStatesAndCosts.tolist()
-
     def getOnlySuccessors(self, state: util.HSRSearchState) -> list[util.HSRSearchState]:
         actions = self.getValidActions(state)
         nextStates: pd.Series = actions.apply(lambda action: state.getSuccessor(action), axis='columns')  # type: ignore
         return nextStates.tolist()
-
-    def computeNextStateAndCost(self, currentState: util.HSRSearchState, action: pd.Series) -> tuple:
-        newState = currentState.getSuccessor(action)
-        newCost = self.getCostOfState(newState)
-        return newState, newCost
 
     def getCostOfState(self, state: util.HSRSearchState):
         paths_df = self.getAllRailPaths(state)
