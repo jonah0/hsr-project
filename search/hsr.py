@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import util
 import cProfile
+import time
+
 
 cwd = pathlib.Path(__file__).parent.resolve()
 
@@ -23,6 +25,7 @@ class HighSpeedRailProblem:
         # hash is an order-independent identifier for a single OD pair: (JFK,LAX) == (LAX,JFK)
         self.od_matrix['hash'] = [frozenset(x) for x in zip(od_matrix['Origin'], od_matrix['Dest'])]
         self.colsForHash = colsForHash
+        self.hashToCostMetrics: dict[frozenset, pd.DataFrame] = {}
 
     def getStartState(self):
         return util.HSRSearchState(pd.DataFrame(columns=self.od_matrix.columns))
@@ -30,19 +33,8 @@ class HighSpeedRailProblem:
     def isGoalState(self, state: util.HSRSearchState):
         pass
 
-    def getValidActions(self, state: util.HSRSearchState) -> pd.DataFrame:
-        """
-        Returns a DataFrame of valid "actions" that can be taken from the given state.
-        An action is placing a new intercity rail segment, represented by a row in the returned DataFrame.
-        """
-        cols = self.od_matrix.columns
-        merged = self.od_matrix.merge(
-            state.getRailSegments(), how='left', indicator=True,
-            on=['Origin', 'Dest'], suffixes=('', '_state')
-        )
-        mask = merged['_merge'] == 'left_only'
-        actions = merged[mask]
-        return actions[cols]
+    def getValidActions(self, state: util.HSRSearchState):
+        pass
 
     def getOnlySuccessors(self, state: util.HSRSearchState) -> list[util.HSRSearchState]:
         actions = self.getValidActions(state)
@@ -66,12 +58,14 @@ class HighSpeedRailProblem:
         #  -- many paths may share the same rail segments!
         # to get total construction cost, simply sum up cost of segments in state
 
-        # min-max normalization of metrics:
+        # todo normalization of metrics
         score_df = path_metrics[score_cols]
-        normalized = (score_df - score_df.min()) / (score_df.max() - score_df.min())
-        sums = normalized.sum()
         sums = score_df.sum()
-        cost = sums['new_co2'] - sums['hsr_passengers']
+
+        self.hashToCostMetrics[state.getHash()] = score_df
+
+        # 1000 kg co2 is weighted the same as 1 passenger
+        cost = (sums['new_co2'] / 1e6) - sums['hsr_passengers']
 
         return cost
 
@@ -250,6 +244,25 @@ class HSRProblem1(HighSpeedRailProblem):
         totalConstructionCost = state.getRailSegments()['construction_cost_usd'].sum()
         return totalConstructionCost >= self.budget
 
+    def getValidActions(self, state: util.HSRSearchState) -> pd.DataFrame:
+        """
+        Returns a DataFrame of valid "actions" that can be taken from the given state.
+        An action is placing a new intercity rail segment, represented by a row in the returned DataFrame.
+        """
+        cols = self.od_matrix.columns
+        merged = self.od_matrix.merge(
+            state.getRailSegments(), how='left', indicator=True,
+            on=['Origin', 'Dest'], suffixes=('', '_state')
+        )
+        mask = merged['_merge'] == 'left_only'
+        actions = merged[mask]
+
+        # valid actions are those that result in a state with construction cost within our budget
+        currConstructionCost = state.getRailSegments()['construction_cost_usd'].sum()
+        actions = actions[(actions['construction_cost_usd'] + currConstructionCost) <= self.budget]
+
+        return actions[cols]
+
 
 class HSRProblem2(HighSpeedRailProblem):
     """
@@ -261,7 +274,34 @@ class HSRProblem2(HighSpeedRailProblem):
     - The goal state is any state in which the total benefit gained by all rail segments
     is at least the predetermined threshold.
     """
-    pass
+
+    def __init__(self, od_matrix: pd.DataFrame, colsForHash: list[str] = ['Origin', 'Dest'], threshold: float = 0.5) -> None:
+        super().__init__(od_matrix=od_matrix, colsForHash=colsForHash)
+        self.threshold = threshold
+
+    def isGoalState(self, state: util.HSRSearchState):
+        _ = super().getCostOfState(state)  # todo only for calulating metrics
+        score_df = self.hashToCostMetrics[state.getHash()]
+        old_co2 = self.od_matrix['co2_g_flight'].sum()
+        new_co2 = score_df['new_co2'].sum()
+        return (new_co2 / old_co2) <= self.threshold
+
+    def getValidActions(self, state: util.HSRSearchState) -> pd.DataFrame:
+        """
+        Returns a DataFrame of valid "actions" that can be taken from the given state.
+        An action is placing a new intercity rail segment, represented by a row in the returned DataFrame.
+        """
+        cols = self.od_matrix.columns
+        merged = self.od_matrix.merge(
+            state.getRailSegments(), how='left', indicator=True,
+            on=['Origin', 'Dest'], suffixes=('', '_state')
+        )
+        mask = merged['_merge'] == 'left_only'
+        actions = merged[mask]
+        return actions[cols]
+
+    def getCostOfState(self, state: util.HSRSearchState) -> float:
+        return state.getRailSegments()['construction_cost_usd'].sum()
 
 
 def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
@@ -310,29 +350,41 @@ def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
 
 
 def main():
+    start = time.time()
     # to cut down on the search space, only consider cities with a minimum population
-    MIN_POP = 400e3
+    MIN_POP = 1e6
     MAX_POP = 1e99
     BUDGET_USD = 50e9
 
     # todo: decide: each city is either represented by its name or its IATA airport code (BOS, LAX...)
     od_matrix = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
-    mask = (od_matrix['pop_origin'] >= MIN_POP) &\
+
+    mask1 = (od_matrix['pop_origin'] >= MIN_POP) &\
         (od_matrix['pop_origin'] <= MAX_POP) &\
         (od_matrix['pop_dest'] >= MIN_POP) &\
         (od_matrix['pop_dest'] <= MAX_POP)
-    filtered_od = od_matrix[mask]
+    filtered_od1 = od_matrix[mask1]
 
-    hsr = HSRProblem1(od_matrix=filtered_od, budget=BUDGET_USD)
+    mask2 = (od_matrix['NonStopKm'] >= 100)\
+        & (od_matrix['NonStopKm'] <= 700)\
+        & (od_matrix['Passengers'] >= 10e3)
+    filtered_od2 = od_matrix[mask2].sort_values('Passengers', ascending=False).head(5)
+    print('input OD-matrix size:', len(filtered_od2))
 
-    solution = HSRSearch(hsr)
+    hsr1 = HSRProblem1(od_matrix=filtered_od2, budget=BUDGET_USD)
+    hsr2 = HSRProblem2(od_matrix=filtered_od2, threshold=0.5)
+
+    solution = HSRSearch(hsr2)
     if solution:
         print('solution found! exporting to csv...')
-        solution.railSegments.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
+        solution.railSegments.to_csv(cwd.joinpath('../out/solution-test2.csv'), index=False)
     else:
         print('no solution found :(')
 
+    end = time.time()
+    print('elapsed time (s):', end - start)
+
 
 if __name__ == '__main__':
-    # cProfile.run('main()', sort='cumulative') # for time analysis
+    # cProfile.run('main()', sort='cumulative')  # for time analysis
     main()
