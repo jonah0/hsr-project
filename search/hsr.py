@@ -323,6 +323,8 @@ def HSRSearch(problem: HighSpeedRailProblem, heuristic=util.nullHeuristic):
     frontier.push(startStateHash, 0)
 
     while not frontier.isEmpty():
+        print('explored:', len(explored))
+
         currentStateHash = frontier.pop()
         currentState = hashToState[currentStateHash]
         # currentCost = hashToCost[currentStateHash] # todo needed?
@@ -354,7 +356,7 @@ def main():
     # to cut down on the search space, only consider cities with a minimum population
     MIN_POP = 1e6
     MAX_POP = 1e99
-    BUDGET_USD = 50e9
+    BUDGET_USD = 10e9
 
     # todo: decide: each city is either represented by its name or its IATA airport code (BOS, LAX...)
     od_matrix = pd.read_csv(cwd.joinpath('../data/algo_testing_data.csv'))
@@ -368,12 +370,13 @@ def main():
     mask2 = (od_matrix['NonStopKm'] >= 100)\
         & (od_matrix['NonStopKm'] <= 700)\
         & (od_matrix['Passengers'] >= 10e3)
-    filtered_od2 = od_matrix[mask2].sort_values('Passengers', ascending=False).head(5)
+    filtered_od2 = od_matrix[mask2].sort_values('Passengers', ascending=False).head(12)
     print('input OD-matrix size:', len(filtered_od2))
 
-    hsr1 = HSRProblem1(od_matrix=filtered_od2, budget=BUDGET_USD)
-    hsr2 = HSRProblem2(od_matrix=filtered_od2, threshold=0.5)
+    hsr1 = HSRProblem1(od_matrix=filtered_od1, budget=BUDGET_USD)
+    hsr2 = HSRProblem2(od_matrix=filtered_od2, threshold=0.25)
 
+    # solution = HSRSearch(hsr1)
     solution = HSRSearch(hsr2)
     if solution:
         print('solution found! exporting to csv...')
