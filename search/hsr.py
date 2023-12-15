@@ -380,7 +380,7 @@ def main():
     solution = HSRSearch(hsr2)
     if solution:
         print('solution found! exporting to csv...')
-        solution.railSegments.to_csv(cwd.joinpath('../out/solution-test2.csv'), index=False)
+        solution.railSegments.to_csv(cwd.joinpath('../out/solution.csv'), index=False)
     else:
         print('no solution found :(')
 
