@@ -61,7 +61,7 @@ class HighSpeedRailProblem:
 
     def getCostOfState(self, state: util.HSRSearchState):
         paths_df = self.getAllRailPaths(state)
-        path_attributes = self.getPathAttributes(paths_df, od_matrix)
+        path_attributes = self.getPathAttributes(paths_df, self.od_matrix)
         path_metrics = self.calcFinalMetrics(path_attributes)
 
         score_cols = [
