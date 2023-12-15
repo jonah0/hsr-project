@@ -11,7 +11,7 @@ def sum_db1b_passengers(year: int, quarter: int) -> pd.DataFrame:
         raise Exception('Must specify both year and quarter!')
 
     db1b = pd.read_csv(cwd.joinpath(
-        f'./data/db1b-survey/market/Origin_and_Destination_Survey_DB1BMarket_{year}_{quarter}.csv'
+        f'../data/db1b-survey/market/Origin_and_Destination_Survey_DB1BMarket_{year}_{quarter}.csv'
     ))
 
     cols_of_interest = [
@@ -42,7 +42,7 @@ quarter_dfs = []
 for qt in range(1, 5):
     df = sum_db1b_passengers(year=year, quarter=qt)
     quarter_dfs.append(df)
-    outfilepath = f'./data/db1b-survey/market/processed/db1b-passenger-vol-{year}-{qt}.csv'
+    outfilepath = f'../data/db1b-survey/market/processed/db1b-passenger-vol-{year}-{qt}.csv'
     df.to_csv(cwd.joinpath(outfilepath), index=False)
 
 # concatenate all 'quarter' dataframes together
@@ -59,7 +59,7 @@ df_annum = df_annum.drop(columns='Quarter').groupby(groupby_cols).sum(
 ).reset_index().sort_values(by=['Origin', 'Dest', 'Passengers'])
 
 # write to csv
-outfilepath = f'./data/db1b-survey/market/processed/db1b-passenger-vol-{year}-full.csv'
+outfilepath = f'../data/db1b-survey/market/processed/db1b-passenger-vol-{year}-full.csv'
 df_annum.to_csv(cwd.joinpath(outfilepath), index=False)
 print(df_annum)
 print('Total annual passengers:', df_annum['Passengers'].sum())
