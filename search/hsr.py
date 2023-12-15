@@ -1,5 +1,4 @@
 import pathlib
-
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -21,6 +20,8 @@ class HighSpeedRailProblem:
     def __init__(self, od_matrix: pd.DataFrame, colsForHash: list[str] = ['Origin', 'Dest']) -> None:
         # od_matrix is origin-destination matrix; DataFrame of all city pairs and their associated metrics
         self.od_matrix = od_matrix
+        # hash is an order-independent identifier for a single OD pair: (JFK,LAX) == (LAX,JFK)
+        self.od_matrix['hash'] = [frozenset(x) for x in zip(od_matrix['Origin'], od_matrix['Dest'])]
         self.colsForHash = colsForHash
 
     def getStartState(self):
@@ -58,14 +59,187 @@ class HighSpeedRailProblem:
         newCost = self.getCostOfState(newState)
         return newState, newCost
 
-    def getCostOfState(self, state: util.HSRSearchState) -> float:
-        """
-        Compute the cost of the given state. Lower numbers indicate more desirable states.
+    def getCostOfState(self, state: util.HSRSearchState):
+        paths_df = self.getAllRailPaths(state)
+        path_attributes = self.getPathAttributes(paths_df, od_matrix)
+        path_metrics = self.calcFinalMetrics(path_attributes)
 
-        NOTE: This refers to the UCS/search problem notion of "cost", NOT the monetary construction cost.
+        score_cols = [
+            'delta_travel_time',
+            'hsr_passengers',
+            'flight_passengers',
+            'total_passengers',
+            'new_co2',
+            'delta_co2',
+        ]
+        # NOTE: construction cost USD is not included in this dataframe because it would be overcounted
+        #  -- many paths may share the same rail segments!
+        # to get total construction cost, simply sum up cost of segments in state
+
+        # min-max normalization of metrics:
+        score_df = path_metrics[score_cols]
+        normalized = (score_df - score_df.min()) / (score_df.max() - score_df.min())
+        sums = normalized.sum()
+        sums = score_df.sum()
+        cost = sums['new_co2'] - sums['hsr_passengers']
+
+        return cost
+
+    def getAllRailPaths(self, state: util.HSRSearchState) -> pd.DataFrame:
+        """
+        Build a dataframe of shortest paths between every pair of cities in the provided rail network (state).
+
+        Columns returned:
+        - hash
+        - Origin
+        - Dest
+        - path_origin
+        - path_dest
+        """
+        # represent state as a graph of rail segments
+        G = nx.from_pandas_edgelist(state.getRailSegments(), source='Origin', target='Dest', edge_attr='NonStopKm')
+
+        # build dataframe of shortest paths between every pair of cities in the rail network
+        # paths_df will contain one row for each leg of each shortest path
+        paths_tuples: list[tuple[str, dict[str, list[str]]]] = nx.all_pairs_dijkstra_path(G, weight='NonStopKm')
+        visited_paths: set[frozenset] = set()
+        paths_df = pd.DataFrame(columns=['hash', 'Origin', 'Dest', 'path_origin', 'path_dest'])
+
+        for (origin, paths_dict) in paths_tuples:
+            for (dest, path) in paths_dict.items():
+                pathKey = frozenset([origin, dest])
+                # skip 0-length and already-seen paths
+                # TODO skip paths between airports in same city
+                if origin == dest or pathKey in visited_paths:
+                    continue
+                visited_paths.add(pathKey)
+
+                # create small dataframe to represent this path; each row is an edge
+                df = pd.DataFrame(path, columns=['Origin'])
+                df['Dest'] = df['Origin'].shift(-1)
+                df = df.dropna()
+                df['path_origin'] = path[0]
+                df['path_dest'] = path[-1]
+                # hash is an order-independent identifier for a single edge: (JFK,LAX) == (LAX,JFK)
+                df['hash'] = [frozenset(x) for x in zip(df['Origin'], df['Dest'])]
+                paths_df = pd.concat([paths_df, df], axis='index')
+
+        return paths_df
+
+    def getPathAttributes(self, paths_df: pd.DataFrame, od_matrix: pd.DataFrame) -> pd.DataFrame:
+        """
+        Merge paths_df with the OD-matrix to obtain attributes for each rail segment present in the network.
+
+        For each path, sum the following:
+        - travel time by HSR
+        - travel distance by HSR
+        - co2 emitted by HSR journey
+
+        For each path, count the following:
+        - number of legs in the rail journey
         """
 
-        return 0
+        # merge paths_df with the OD-matrix to obtain attributes for each rail segment present in the network
+        paths_df = paths_df.merge(od_matrix.drop(columns=['Origin', 'Dest']), on='hash', how='left', validate='m:1')
+        # group paths_df by unique path
+        paths_df['path_hash'] = [frozenset(x) for x in zip(paths_df['path_origin'], paths_df['path_dest'])]
+        path_groups = paths_df.groupby('path_hash')[[
+            'NonStopKm',
+            'hsr_time_hr',
+            'co2_g_hsr',
+        ]]
+
+        # for each path, sum the following:
+        # - travel time by HSR
+        # - travel distance by HSR -> becomes hsr_km (distance by rail journey)
+        # - co2 emitted by HSR journey
+        hsr_metrics = path_groups.sum()
+        # for each path, count the following:
+        # - number of legs in the rail journey
+        hsr_metrics['hsr_legs'] = path_groups.count()['NonStopKm']
+        hsr_metrics = hsr_metrics.rename(columns={'NonStopKm': 'hsr_km'}).reset_index()
+
+        # merge OD-matrix back into aggregated path data to link metrics for HSR journey/path with
+        #  corresponding metrics for direct flight journey
+        hsr_metrics = hsr_metrics.merge(
+            od_matrix[[
+                'hash',
+                'Origin', 'Dest',
+                'NonStopKm',
+                'Passengers',
+                'flight_time_hr',
+                'co2_g_flight',
+                # 'city_origin', 'state_origin', 'pop_origin',
+                # 'city_dest', 'state_dest', 'pop_dest',
+            ]],
+            left_on='path_hash',
+            right_on='hash',
+            how='outer',
+            validate='1:1',
+        ).rename(columns={'Passengers': 'total_passengers', 'NonStopKm': 'flight_km'}).drop(columns=['hash'])
+
+        return hsr_metrics
+
+    def calcFinalMetrics(self, hsr_metrics: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate the final metrics that will be used for the cost function.
+
+        Metrics calculated:
+        - delta_travel_time -- change in travel time when opting for HSR over flying on this route
+        - hsr_passengers -- number of passengers who will opt to take HSR on this route instead of flying
+        - flight_passengers -- number of passengers who will still opt to fly this route
+        - total_passengers -- total annual passenger volume on this route
+        - new_co2 -- total annual co2 emissions from combined HSR + flight volumes on this route (units: grams)
+        - delta_co2 -- change in total annual co2 emissions on this route
+        """
+
+        metrics = hsr_metrics.copy()
+
+        # add 3 hours for travel time to/from airport, security, gate times, etc.
+        metrics['flight_time_hr'] += 3
+
+        metrics['delta_travel_time'] = (metrics['hsr_time_hr'] - metrics['flight_time_hr']).fillna(0)
+
+        # number of passengers who will opt to take this HSR path instead of the corresponding flight
+        # assumed proportion of passengers who will opt to take HSR over flying:
+        # let t = time(HSR) / time(flight):
+        # prop0: t<1.0 = 1.0 = 100% of passengers
+        # prop1: 1.00-1.25 = 0.9
+        # prop2: 1.25-1.50 = 0.8
+        # prop3: 1.50-2.0 = 0.7
+        # prop4: t>2.0 = 0.5
+
+        t = metrics['hsr_time_hr'] / metrics['flight_time_hr']
+        prop0 = t > 0
+        prop1 = t > 1
+        prop2 = t > 1.25
+        prop3 = t > 1.50
+        prop4 = t > 2.0
+
+        hsr_passengers = pd.Series(index=metrics['total_passengers'].index)
+        hsr_passengers.loc[prop0] = metrics['total_passengers']
+        hsr_passengers.loc[prop1] = metrics['total_passengers'] * 0.9
+        hsr_passengers.loc[prop2] = metrics['total_passengers'] * 0.8
+        hsr_passengers.loc[prop3] = metrics['total_passengers'] * 0.7
+        hsr_passengers.loc[prop4] = metrics['total_passengers'] * 0.5
+        metrics['hsr_passengers'] = hsr_passengers.fillna(0)
+
+        metrics['flight_passengers'] = metrics['total_passengers'] - metrics['hsr_passengers']
+
+        # source: https://travelandclimate.org/transport-calculations
+        # pkm = passenger-kilometer
+        # units: g/pkm
+        co2_pkm_flight = 133  # from 'Scheduled flight (Economy)'
+        co2_pkm_hsr = 24  # from 'Electric train (Europe)'
+        # change in co2 when switching from flight -> HSR
+        metrics['new_co2'] = (
+            (co2_pkm_flight * metrics['flight_passengers'] * metrics['hsr_km'])
+            + (co2_pkm_hsr * metrics['hsr_passengers'] * metrics['flight_km'])
+        ).fillna(metrics['co2_g_flight'])
+
+        metrics['delta_co2'] = metrics['new_co2'] - metrics['co2_g_flight']
+
+        return metrics
 
 
 class HSRProblem1(HighSpeedRailProblem):
