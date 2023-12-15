@@ -217,8 +217,8 @@ class HighSpeedRailProblem:
         co2_pkm_hsr = 24  # from 'Electric train (Europe)'
         # change in co2 when switching from flight -> HSR
         metrics['new_co2'] = (
-            (co2_pkm_flight * metrics['flight_passengers'] * metrics['hsr_km'])
-            + (co2_pkm_hsr * metrics['hsr_passengers'] * metrics['flight_km'])
+            (co2_pkm_flight * metrics['flight_passengers'] * metrics['flight_km'])
+            + (co2_pkm_hsr * metrics['hsr_passengers'] * metrics['hsr_km'])
         ).fillna(metrics['co2_g_flight'])
 
         metrics['delta_co2'] = metrics['new_co2'] - metrics['co2_g_flight']
