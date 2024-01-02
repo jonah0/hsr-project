@@ -84,31 +84,40 @@ class HighSpeedRailProblem:
         G = nx.from_pandas_edgelist(state.getRailSegments(), source='Origin', target='Dest', edge_attr='NonStopKm')
 
         # build dataframe of shortest paths between every pair of cities in the rail network
-        # paths_df will contain one row for each leg of each shortest path
+        # the returned dataframe will contain one row for each leg of each shortest path
         paths_tuples: list[tuple[str, dict[str, list[str]]]] = nx.all_pairs_dijkstra_path(G, weight='NonStopKm')
-        visited_paths: set[frozenset] = set()
-        paths_df = pd.DataFrame(columns=['hash', 'Origin', 'Dest', 'path_origin', 'path_dest'])
+        path_dfs = [self.pathDictToDataFrame(origin, paths_dict) for (origin, paths_dict) in paths_tuples]
 
-        for (origin, paths_dict) in paths_tuples:
-            for (dest, path) in paths_dict.items():
-                pathKey = frozenset([origin, dest])
-                # skip 0-length and already-seen paths
-                # TODO skip paths between airports in same city
-                if origin == dest or pathKey in visited_paths:
-                    continue
-                visited_paths.add(pathKey)
+        if len(path_dfs) > 0:
+            return pd.concat(path_dfs, axis='index')
+        else:
+            return pd.DataFrame(columns=['Origin', 'Dest', 'path_origin', 'path_dest', 'hash'])
 
-                # create small dataframe to represent this path; each row is an edge
-                df = pd.DataFrame(path, columns=['Origin'])
-                df['Dest'] = df['Origin'].shift(-1)
-                df = df.dropna()
-                df['path_origin'] = path[0]
-                df['path_dest'] = path[-1]
-                # hash is an order-independent identifier for a single edge: (JFK,LAX) == (LAX,JFK)
-                df['hash'] = [frozenset(x) for x in zip(df['Origin'], df['Dest'])]
-                paths_df = pd.concat([paths_df, df], axis='index')
+    def pathDictToDataFrame(self, origin: str, pathDict: dict[str, list[str]]) -> pd.DataFrame:
+        """
+        Helper function for getAllRailPaths.
+        Given an origin and its path dict, returns a DataFrame with one row for each edge of each path.
 
-        return paths_df
+        The path dict is keyed by destination node, and its values are paths represented as lists of nodes
+        from origin to destination.
+        """
+        # create dataframe where each row has a path to a single destination
+        df = pd.Series(pathDict)\
+            .to_frame()\
+            .reset_index(names='path_dest')\
+            .rename(columns={0: 'path'})
+        df['path_origin'] = origin
+
+        # 'explode' the path list into multiple columns, one for each node in the path
+        df = df.explode(column='path').rename(columns={'path': 'Origin'})
+        # shift the exploded path up 1 on order to pair adjacent nodes into edges traversed along the path
+        df['Dest'] = df.groupby(by=['path_origin', 'path_dest'])['Origin'].shift(-1)
+        # drop NA values to remove the last unpaired node
+        df = df.dropna()
+        # hash is an order-independent identifier for a single edge: (JFK,LAX) == (LAX,JFK)
+        df['hash'] = [frozenset(x) for x in zip(df['Origin'], df['Dest'])]
+        # reorder columns for readability
+        return df[['Origin', 'Dest', 'path_origin', 'path_dest', 'hash']]
 
     def getPathAttributes(self, paths_df: pd.DataFrame, od_matrix: pd.DataFrame) -> pd.DataFrame:
         """
