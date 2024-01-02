@@ -85,7 +85,7 @@ class HighSpeedRailProblem:
 
         # build dataframe of shortest paths between every pair of cities in the rail network
         # the returned dataframe will contain one row for each leg of each shortest path
-        paths_tuples: list[tuple[str, dict[str, list[str]]]] = nx.all_pairs_dijkstra_path(G, weight='NonStopKm')
+        paths_tuples: list[tuple[str, dict[str, list[str]]]] = nx.all_pairs_dijkstra_path(G, weight='NonStopKm') # type: ignore
         path_dfs = [self.pathDictToDataFrame(origin, paths_dict) for (origin, paths_dict) in paths_tuples]
 
         if len(path_dfs) > 0:
